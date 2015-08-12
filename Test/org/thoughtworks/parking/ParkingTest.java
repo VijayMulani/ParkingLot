@@ -1,66 +1,35 @@
 package org.thoughtworks.parking;
-
 import junit.framework.Assert;
-
+import static org.mockito.Mockito.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 import org.thoughtworks.exceptions.CarAlreadyParkedException;
+import org.thoughtworks.exceptions.CarNotParkedException;
+import org.thoughtworks.exceptions.ParkingSpaceFullException;
 
 public class ParkingTest {
 
+	private ParkingLotFullSubscriber Swetha;
+	private ParkingLotFullSubscriber FBIVijay;
 	private ParkingLot parkingLot;
 	@Before
 	public void setup()
 	{
+		Swetha=new ParkingLotOwner();
 		parkingLot=new ParkingLot(10);
-		parkingLot.addAvailableParkingSpace(1);
-		parkingLot.addAvailableParkingSpace(2);
-		parkingLot.addAvailableParkingSpace(3);
-		parkingLot.addAvailableParkingSpace(4);
-		parkingLot.addAvailableParkingSpace(5);
-		parkingLot.addAvailableParkingSpace(6);
-		parkingLot.addAvailableParkingSpace(7);
-		parkingLot.addAvailableParkingSpace(8);
-		parkingLot.addAvailableParkingSpace(9);
-		parkingLot.addAvailableParkingSpace(10);	
+		parkingLot.subscribeForFull(Swetha);
+		
 	}
 	@After
 	public void cleanup()
 	{
 		parkingLot=null;
+		Swetha=null;
 	}
 	
 	
-	
-	
-	
-	/*@Test
-	public void whetherSpaceIsAdded()
-	{
-		int index=parkingLot.isParkingSpaceAvailable();
-		
-		Assert.assertEquals(1,index );
-
-	}
-	@Test 
-	public void whetherSpaceIsAvailable()
-	{
-		
-		int index=parkingLot.isParkingSpaceAvailable();
-		boolean b=index>0?true:false;
-		Assert.assertTrue(b);
-	}
-	@Test 
-	public void whetherSpaceIsNotAvailable()
-	{
-		ParkingLot parkingLot=new ParkingLot(0);
-		
-		int index=parkingLot.isParkingSpaceAvailable();
-		
-		boolean b=index>0?true:false;
-		Assert.assertFalse(b);
-	}*/
 	
 	
 	
@@ -69,23 +38,17 @@ public class ParkingTest {
 	public void whetherParked()
 	{
 		Car car=new Car("abc");
-		int index=parkingLot.parkCar(car);
-		boolean b=index>0?true:false;
 		
-		
-		Assert.assertTrue(b);
+		Assert.assertEquals(true, parkingLot.parkCar(car) instanceof Token);
 	}
 
-	@Test
+	@Test(expected=ParkingSpaceFullException.class)
 	public void whetherNotParked()
 	{
 		ParkingLot parkingLot=new ParkingLot(0);
 		Car car=new Car("abc");
-		int index=parkingLot.parkCar(car);
-		boolean b=index>0?true:false;
-		
-		
-		Assert.assertFalse(b);
+		Token token=parkingLot.parkCar(car);
+	
 	}
 
 
@@ -94,26 +57,120 @@ public class ParkingTest {
 	@Test(expected=CarAlreadyParkedException.class)
 	public void cannotParkDuplicate(){
 		Car car=new Car("abc");
-		int index=parkingLot.parkCar(car);
+		Token token=parkingLot.parkCar(car);
 		parkingLot.parkCar(car);
 	}
 
 	@Test
 	public void shouldUnpark(){
 		Car car=new Car("abc");
-		int index=parkingLot.parkCar(car);
+		Token token=parkingLot.parkCar(car);
 		
 		
-		Assert.assertTrue(parkingLot.unpark(car));
+		Assert.assertEquals(car,parkingLot.unpark(token));
 
 	}
 	
-	@Test
+	@Test(expected=CarNotParkedException.class)
 	public void shouldNotUnpark(){
 		Car car=new Car("abc");	
+		Token token=parkingLot.parkCar(car);
+		parkingLot.unpark(token);
 		
-		
-		Assert.assertFalse(parkingLot.unpark(car));
-
+		parkingLot.unpark(token);
 	}
+	
+	@Test
+	public void shouldNotifyOwnerOnParkingFull()
+	{
+		ParkingLotOwner mockedOwner=mock(ParkingLotOwner.class);
+		
+		ParkingLot parkingLot=new ParkingLot(1);
+		parkingLot.subscribeForAvailable(mockedOwner);
+		parkingLot.subscribeForFull(mockedOwner);
+		
+		Car car=new Car("abc");
+		Token token=parkingLot.parkCar(car);
+		
+		
+		Mockito.verify(mockedOwner,times(1)).getParkingFullNotification(parkingLot);
+		
+		
+	}
+	@Test
+	public void shouldNotNotifyMultipleTimes()throws ParkingSpaceFullException
+	{
+		ParkingLotOwner mockedOwner=mock(ParkingLotOwner.class);
+		ParkingLot parkingLot=new ParkingLot(1);
+		parkingLot.subscribeForAvailable(mockedOwner);
+		parkingLot.subscribeForFull(mockedOwner);
+		Car car=new Car("abc");
+		Car car2=new Car("abcd");
+		try{
+		parkingLot.parkCar(car);
+		parkingLot.parkCar(car2);
+		}catch(ParkingSpaceFullException e)
+		{}
+		
+		
+		Mockito.verify(mockedOwner,times(1)).getParkingFullNotification(parkingLot);
+	}
+	@Test
+	public void shouldNotNotifyOwnerWhenSpaceAvailable()
+	{
+		ParkingLotOwner mockedOwner=mock(ParkingLotOwner.class);
+		ParkingLot parkingLot=new ParkingLot(2);
+		parkingLot.subscribeForAvailable(mockedOwner);
+		parkingLot.subscribeForFull(mockedOwner);
+		Car car=new Car("abc");
+		Token token=parkingLot.parkCar(car);
+		
+		Mockito.verify(mockedOwner,never()).getParkingAvailableNotification(parkingLot);
+	}
+	
+	@Test
+	public void shouldNotifyOwnerWhenSpaceAvailable()
+	{
+		ParkingLotOwner mockedOwner=mock(ParkingLotOwner.class);
+		ParkingLot parkingLot=new ParkingLot(1);
+		parkingLot.subscribeForAvailable(mockedOwner);
+		parkingLot.subscribeForFull(mockedOwner);
+		Car car=new Car("abc");
+		Token token=parkingLot.parkCar(car);
+	
+		
+		parkingLot.unpark(token);
+		
+		Mockito.verify(mockedOwner,times(1)).getParkingAvailableNotification(parkingLot);
+	}
+	
+	@Test
+	public void shouldNotifyOnceOnSpaceAvailable()
+	{
+		ParkingLotOwner mockedOwner=mock(ParkingLotOwner.class);
+		ParkingLot parkingLot=new ParkingLot(2);
+		parkingLot.subscribeForAvailable(mockedOwner);
+		parkingLot.subscribeForFull(mockedOwner);
+		Car car=new Car("abc");
+		Car car2=new Car("abcd");
+		Token token=parkingLot.parkCar(car);
+		Token token2=parkingLot.parkCar(car2);
+		
+		parkingLot.unpark(token);
+		parkingLot.unpark(token2);
+		Mockito.verify(mockedOwner,times(1)).getParkingAvailableNotification(parkingLot);
+	}
+	
+	@Test
+	public void shouldNotifyFBIWhenFull()
+	{
+		ParkingLotFullSubscriber mockFBIAgent=mock(FBIAgent.class);
+		ParkingLot parkingLot=new ParkingLot(1);
+		parkingLot.subscribeForFull(mockFBIAgent);
+		Car car=new Car("abc");
+		parkingLot.parkCar(car);
+		
+		Mockito.verify(mockFBIAgent,times(1)).getParkingFullNotification(parkingLot);
+	}
+	
 }
