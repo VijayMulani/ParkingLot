@@ -14,6 +14,7 @@ public class ParkingTest {
 	private ParkingLotFullSubscriber Swetha;
 	private ParkingLotFullSubscriber FBIVijay;
 	private ParkingLot parkingLot;
+	
 	@Before
 	public void setup()
 	{
